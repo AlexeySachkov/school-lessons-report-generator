@@ -14,3 +14,4 @@ if __name__ == '__main__':
 
     if args.action == 'generate':
         lib.render_personal_reports(args.data_file)
+        lib.render_main_page(args.data_file)
