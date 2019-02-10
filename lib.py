@@ -292,7 +292,7 @@ def render_main_page(data_file):
         file.write('<h2>Список индивидуальных отчётов</h2>')
         file.write('<ul>')
         for handle in data['handles']:
-            file.write('<li><a href="https://nnstu-for-38.github.io/2018-2019-10/reports/{}.html">{}</a></li>'.format(handle, handle))
+            file.write('<li><a href="https://nnstu-for-38.github.io/2018-2019-10/{}.html">{}</a></li>'.format(handle, handle))
         file.write('</ul>')
         file.write('</div></div></div>')
         file.write(FOOTER)
