@@ -1,3 +1,5 @@
 reports/
 venv/
 .idea/
+cache/
+__pycache__/
