@@ -1,6 +1,11 @@
 import json
+import os
 
 BASE_PATH = 'cache/'
+
+
+def exists(key):
+    return os.path.isfile(BASE_PATH + key + '.json')
 
 
 def save(key, obj):

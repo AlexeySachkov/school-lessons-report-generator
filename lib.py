@@ -4,7 +4,7 @@ import codecs
 import datetime
 import time
 import json
-import re
+import pyquery
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -44,12 +44,44 @@ def datetimefilter(v, format='%d.%m.%Y %H:%M'):
     return v.strftime(format)
 
 
+def fetch_submission_source_code(submission):
+    if submission['contestId'] == '100092':
+        return None # skip trainings. source code cannot be obtained
+
+    url = 'https://codeforces.com/contest/{}/submission/{}'.format(
+        submission['contestId'], submission['id'])
+    connected = False
+    while not connected:
+        try:
+            d = pyquery.PyQuery(url)
+            connected = True
+        except TimeoutError:
+            connected = False
+        except OSError:
+            connected = False
+
+    html = d("#program-source-text").html()
+    if html is None:
+        print('cannot obtain program sources for: {}'.format(url))
+        return None
+
+    return html
+
+
 def fetch_data(data_file):
     with open('data/{}'.format(data_file)) as file:
         data = json.load(file)
 
     for handle in data['handles']:
-        cache.save('{}.submissions'.format(handle), api.fetch_submissions(handle))
+        all_submissions = api.fetch_submissions(handle)
+        # TODO: error handling
+        for submission in all_submissions:
+            key = '{}.{}'.format(handle, submission['id'])
+            if not cache.exists(key):
+                code = fetch_submission_source_code(submission)
+                submission['source_code'] = code
+                cache.save(key, submission)
+                time.sleep(3)
 
 
 def render_personal_report(handle, term_data):
