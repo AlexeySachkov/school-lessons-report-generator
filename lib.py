@@ -202,6 +202,7 @@ def render_personal_reports(data_file):
             render_personal_report(handle, data['terms'][1])
 
 def render_main_page(data_file):
+    # Prepare data
     with open('data/{}'.format(data_file)) as file:
         data = json.load(file)
         for term in data['terms']:
@@ -218,64 +219,18 @@ def render_main_page(data_file):
                 d, m, y = classwork['dates'][1]
                 classwork['dates'][1] = datetime.date(y, m, d)
 
+    # Prepare template
+    env = Environment(
+        loader=FileSystemLoader('templates'),
+        autoescape=select_autoescape('html')
+    )
+    env.filters['date'] = datefilter
+    env.filters['datetime'] = datetimefilter
+
+    template = env.get_template('main-page.html')
+
     with codecs.open('reports/index.html', 'w', "utf-8") as file:
-        file.write(HEADER)
-        file.write('<div class="container"><div class="row"><div class="col-md-12">')
-        file.write('<h1>Отчёт о решении задач на codeforces</h1><hr />')
-        file.write('<h2>Домашние задания</h2>')
-        file.write('<div class="card-group">')
-        index = 0
-        for homework in data['terms'][1]['homeworks']:
-            index = index + 1
-            file.write('<div class="card"><div class="card-header">')
-            file.write('Домашняя работа №{}</div>'.format(index))
-            file.write('<ul class="list-group list-group-flush">')
-            file.write('<li class="list-group-item">Задана: {}</li>'.format(homework['from'].strftime("%d.%m.%Y")))
-            file.write('<li class="list-group-item">Сдать до: {}</li>'.format(homework['to'].strftime("%d.%m.%Y")))
-            file.write('<li class="list-group-item">Список задач: ')
-
-            total = len(homework['problems'])
-            current = 0
-            for problem in homework['problems']:
-                current = current + 1
-                matches = re.match(r'(\d+)([A-E]+)', problem)
-                if matches is None:
-                    file.write(problem)
-                else:
-                    file.write('<a href="https://codeforces.com/contest/{}/problem/{}" target="_blank">{}</a>'.format(matches[1], matches[2], problem))
-                if current != total:
-                    file.write(', ')
-            file.write('</li></ul></div>')
-
-        file.write("</div>")
-        file.write('<h2>Классная работа</h2>')
-        file.write('<div class="card-group">')
-        index = 0
-        for homework in data['terms'][1]['classworks']:
-            index = index + 1
-            file.write('<div class="card"><div class="card-header">')
-            file.write('Классная работа {}/{}</div>'.format(homework['dates'][0].strftime("%d.%m.%Y"), homework['dates'][1].strftime("%d.%m.%Y")))
-            file.write('<ul class="list-group list-group-flush">')
-            file.write('<li class="list-group-item">Список задач: ')
-
-            total = len(homework['problems'])
-            current = 0
-            for problem in homework['problems']:
-                current = current + 1
-                matches = re.match(r'(\d+)([A-E]+)', problem)
-                if matches is None:
-                    file.write(problem)
-                else:
-                    file.write('<a href="https://codeforces.com/contest/{}/problem/{}" target="_blank">{}</a>'.format(matches[1], matches[2], problem))
-                if current != total:
-                    file.write(', ')
-            file.write('</li></ul></div>')
-
-        file.write("</div>")
-        file.write('<h2>Список индивидуальных отчётов</h2>')
-        file.write('<ul>')
-        for handle in data['handles']:
-            file.write('<li><a href="https://nnstu-for-38.github.io/2018-2019-10/{}.html">{}</a></li>'.format(handle, handle))
-        file.write('</ul>')
-        file.write('</div></div></div>')
-        file.write(FOOTER)
+        file.write(template.render(handles=data['handles'],
+                                   homeworks=data['terms'][1]['homeworks'],
+                                   classworks=data['terms'][1]['classworks'],
+                                   last_update=datetime.datetime.now()))
