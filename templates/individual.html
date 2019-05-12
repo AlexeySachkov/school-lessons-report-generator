@@ -20,7 +20,7 @@
           <div class="card-body">
             {% for problem_index, data in homework.per_problem_info.items() %}
               <h5 class="card-title">{{ problem_index }}</h5>
-              {% if data.num_submissions == 0 %}
+              {% if data.no_submissions %}
                 <p class="text-danger"><strong>Не было сделано ни одной попытки!</strong></p>
               {% elif data.got_ac %}
                 {% if data.in_time %}
@@ -32,12 +32,14 @@
                 <p class="text-danger">Задача не была сдана</p>
               {% endif %}
 
-              <p><a data-toggle="collapse" href="#submissions-for-{{ problem_index }}">Показать все попытки</a></p>
-              <ul class="collapse" id="submissions-for-{{ problem_index }}">
-                {% for submission in submissions[problem_index] %}
-                  <li><a href="https://codeforces.com/contest/{{ submission.problem.contestId }}/submission/{{ submission.id }}">{{ submission.id }}</a> - {{ submission.verdict }}</li>
-                {% endfor %}
-              </ul>
+              {% if not data.no_submissions %}
+                <p><a data-toggle="collapse" href="#submissions-for-{{ problem_index }}">Показать все попытки</a></p>
+                <ul class="collapse" id="submissions-for-{{ problem_index }}">
+                  {% for submission in submissions[problem_index] %}
+                    <li><a href="https://codeforces.com/contest/{{ submission.problem.contestId }}/submission/{{ submission.id }}">{{ submission.id }}</a> - {{ submission.verdict }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
             {% endfor %}
           </div>
           <div class="card-footer">
@@ -68,6 +70,34 @@
           </div>
         </div>
         <br />
+      {% endfor %}
+
+      {% for classwork in classworks %}
+      <div class="card">
+        <div class="card-header">Классная работа {{ classwork.info.dates[0]|date }}/{{ classwork.info.dates[1]|date }}</div>
+        <div class="card-body">
+          {% for problem_index, data in classwork.per_problem_info.items() %}
+            <h5 class="card-title">{{ problem_index }}</h5>
+            {% if data.no_submissions %}
+              <p class="text-danger"><strong>Не было сделано ни одной попытки</strong></p>
+            {% elif data.got_ac %}
+              <p class="text-success">Задача была сдана</p>
+            {% else %}
+              <p class="text-danger">Задача не была сдана</p>
+            {% endif %}
+
+            {% if not data.no_submissions %}
+              <p><a data-toggle="collapse" href="#submissions-for-{{ problem_index }}">Показать все попытки</a></p>
+              <ul class="collapse" id="submissions-for-{{ problem_index }}">
+                {% for submission in submissions[problem_index] %}
+                <li><a href="https://codeforces.com/contest/{{ submission.problem.contestId }}/submission/{{ submission.id }}">{{ submission.id }}</a> - {{ submission.verdict }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <br />
       {% endfor %}
     </div>
   </div>
