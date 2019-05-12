@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <h2 class="page-header">
+        Отчёт о выполнении домашнего задания
+        <a href="https://codeforces.com/profile/{{ handle }}">{{ handle }}</a>
+      </h2>
+      <hr />
+
+      {% for homework in homeworks %}
+        <div class="card">
+          <div class="card-header">Домашняя работа №{{ loop.index }}</div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Задана: {{ homework.info.from|date }}</li>
+            <li class="list-group-item">Сдать до: {{ homework.info.to|date }}</li>
+          </ul>
+          <div class="card-body">
+            {% for problem_index, data in homework.per_problem_info.items() %}
+              <h5 class="card-title">{{ problem_index }}</h5>
+              {% if data.num_submissions == 0 %}
+                <p class="text-danger"><strong>Не было сделано ни одной попытки!</strong></p>
+              {% elif data.got_ac %}
+                {% if data.in_time %}
+                  <p class="text-success"><strong>Задача была сдана вовремя</strong></p>
+                {% else %}
+                  <p class="text-warning">Задача не была сдана вовремя, однако была дорешена позже</p>
+                {% endif %}
+              {% else %}
+                <p class="text-danger">Задача не была сдана</p>
+              {% endif %}
+
+              <p><a data-toggle="collapse" href="#submissions-for-{{ problem_index }}">Показать все попытки</a></p>
+              <ul class="collapse" id="submissions-for-{{ problem_index }}">
+                {% for submission in submissions[problem_index] %}
+                  <li><a href="https://codeforces.com/contest/{{ submission.problem.contestId }}/submission/{{ submission.id }}">{{ submission.id }}</a> - {{ submission.verdict }}</li>
+                {% endfor %}
+              </ul>
+            {% endfor %}
+          </div>
+          <div class="card-footer">
+            <p><strong>Система оценок: </strong>
+              1 балл за задачу, которая была сдана вовремя, 0.75 за дорешанную позже задачу
+            </p>
+            <p>
+              Оценка выставляется исходя из процентного соотношения количества полученных
+              баллов к маскимально возможному
+            </p>
+            <p><= 25% - 2; <= 50% - 3; <= 75% - 4; > 75% - 5</p>
+            <p>
+              Всего решено задач: {{ homework.num_in_time + homework.num_late }},
+              вовремя: {{ homework.num_in_time }}, дорешано: {{ homework.num_late }},
+              оценка:
+              {% set score = homework.num_in_time + homework.num_late * 0.75 %}
+              {% set percent = (score / homework.total_problems) * 100 %}
+              {% if percent <= 25 %}
+                2
+              {% elif percent <= 50 %}
+                3
+              {% elif percent <= 75 %}
+                4
+              {% else %}
+                5
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        <br />
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
