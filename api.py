@@ -17,6 +17,10 @@ def fetch_submissions(handle):
             print("OS Error: {}".format(err))
             connected = False
 
+    if not connected:
+        print("Failed to connect")
+        return None
+
     data = json.loads(content)
 
     if data['status'] != 'OK':
