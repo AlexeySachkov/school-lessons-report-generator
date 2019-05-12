@@ -56,20 +56,18 @@ def render_personal_report(handle, term_data):
     fetch_submissions([handle])
     all_submissions = cache.get('{}.submissions'.format(handle))
 
-    submissions_per_problem = {}
-    homeworks_data = []
-    classworks_data = []
-    included_into_homework = set()
-    included_into_classwork = set()
-
     data = sorted(all_submissions, key=lambda k: k['creationTimeSeconds'])
 
+    submissions_per_problem = {}
     for submission in data:
         problem_index = str(submission['problem']['contestId']) + submission['problem']['index']
         if problem_index not in submissions_per_problem:
             submissions_per_problem[problem_index] = [submission]
         else:
             submissions_per_problem[problem_index].append(submission)
+
+    homeworks_data = []
+    included_into_homework = set()
 
     for homework in term_data['homeworks']:
         end_timestamp = next_date_timestamp(homework['to'])
@@ -110,6 +108,9 @@ def render_personal_report(handle, term_data):
             'total_problems': len(homework['problems'])
         })
 
+    classworks_data = []
+    included_into_classwork = set()
+
     for classwork in term_data['classworks']:
         problems_data = {}
         for problem_index in classwork['problems']:
@@ -136,35 +137,30 @@ def render_personal_report(handle, term_data):
             'per_problem_info': problems_data
         })
 
-#        count = 0
-#        startTimestamp = time.mktime(term_data['from'].timetuple())
-#        for problem_index, submissions in submissions_per_problem.items():
-#            if problem_index in included_into_homework or problem_index in included_into_classwork:
-#                continue
-#
-#            actual_submissions = []
-#            for submission in submissions:
-#                if submission['creationTimeSeconds'] >= startTimestamp:
-#                    actual_submissions.append(submission)
-#
-#            if len(actual_submissions) == 0:
-#                continue
-#
-#            count = count + 1
-#            file.write('<h5 class="card-title">{}</h5>'.format(problem))
-#            got_ac = False
-#            for submission in actual_submissions:
-#                if submission['verdict'] == 'OK':
-#                    got_ac = True
-#            if got_ac:
-#                file.write('<strong class="text-success">Задача была сдана</strong>')
-#            else:
-#                file.write('<strong class="text-warning">Задача не была сдана</strong>')
-#            file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
-#            file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
-#            for submission in actual_submissions:
-#                file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
-#            file.write('</ul>')
+    additional_data = []
+
+    startTimestamp = time.mktime(term_data['from'].timetuple())
+    for problem_index, submissions in submissions_per_problem.items():
+        if problem_index in included_into_homework or problem_index in included_into_classwork:
+            continue
+
+        actual_submissions = []
+        for submission in submissions:
+            if submission['creationTimeSeconds'] >= startTimestamp:
+                actual_submissions.append(submission)
+
+        if len(actual_submissions) == 0:
+            continue
+
+        got_ac = False
+        for submission in actual_submissions:
+            if submission['verdict'] == 'OK':
+                got_ac = True
+
+        additional_data.append({
+            'problem_index': problem_index,
+            'got_ac': got_ac
+        })
 
     # Prepare template
     env = Environment(
@@ -181,7 +177,8 @@ def render_personal_report(handle, term_data):
                                    submissions=submissions_per_problem,
                                    homeworks=homeworks_data,
                                    classworks=classworks_data,
-                                   last_update=datetime.datetime.now()))
+                                   last_update=datetime.datetime.now(),
+                                   additional=additional_data))
 
 
 def render_personal_reports(data_file):
