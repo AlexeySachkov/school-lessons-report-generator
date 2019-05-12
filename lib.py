@@ -6,6 +6,8 @@ import time
 import json
 import re
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 HEADER = '<!DOCTYPE html><html>' \
          '<head><title>Отчёт о решении задач на codeforces</title>' \
          '<meta charset="UTF-8" />' \
@@ -40,162 +42,156 @@ def fetch_submissions(handles):
         cache.save('{}.submissions'.format(handle), api.fetch_submissions(handle))
 
 
+def datefilter(v, format='%d.%m.%Y'):
+    return v.strftime(format)
+
+
 def render_personal_report(handle, term_data):
+    # Prepare data
+
     fetch_submissions([handle])
-    submissions = cache.get('{}.submissions'.format(handle))
+    all_submissions = cache.get('{}.submissions'.format(handle))
+
+    submissions_per_problem = {}
+    homeworks_data = []
+    included_into_homework = set()
+    included_into_classwork = set()
+
+    data = sorted(all_submissions, key=lambda k: k['creationTimeSeconds'])
+
+    for submission in data:
+        problem_index = str(submission['problem']['contestId']) + submission['problem']['index']
+        if problem_index not in submissions_per_problem:
+            submissions_per_problem[problem_index] = [submission]
+        else:
+            submissions_per_problem[problem_index].append(submission)
+
+    for homework in term_data['homeworks']:
+        end_timestamp = next_date_timestamp(homework['to'])
+
+        num_in_time = 0
+        num_late = 0
+        problems_data = {}
+        for problem_index in homework['problems']:
+            problems_data[problem_index] = {}
+
+        for problem_index in homework['problems']:
+            included_into_homework.add(problem_index)
+
+            if problem_index not in submissions_per_problem:
+                problems_data[problem_index]['no_submissions'] = True
+            else:
+                problems_data[problem_index]['no_submissions'] = False
+                got_ac = False
+                in_time = False
+                for submission in submissions_per_problem[problem_index]:
+                    if submission['verdict'] == 'OK':
+                        got_ac = True
+                        if submission['creationTimeSeconds'] < end_timestamp:
+                            in_time = True
+                            break
+                problems_data[problem_index]['got_ac'] = got_ac
+                problems_data[problem_index]['in_time'] = in_time
+                problems_data[problem_index]['num_submissions'] = len(submissions_per_problem[problem_index])
+
+                num_in_time = num_in_time + 1 if got_ac and in_time else num_in_time
+                num_late = num_late + 1 if got_ac and not in_time else num_late
+
+        homeworks_data.append({
+            'info': homework,
+            'per_problem_info': problems_data,
+            'num_in_time': num_in_time,
+            'num_late': num_late,
+            'total_problems': len(homework['problems'])
+        })
+
+
+    env = Environment(
+        loader=FileSystemLoader('templates'),
+        autoescape=select_autoescape('html')
+    )
+    env.filters['date'] = datefilter
+
+    template = env.get_template('individual.html')
 
     with codecs.open('reports/{}.html'.format(handle), 'w', "utf-8") as file:
-        file.write(HEADER)
-        file.write('<div class="container"><div class="row"><div class="col-md-12">')
-        file.write('<h2 class="page-header">Отчёт о выполнении домашнего задания <a href="https://codeforces.com/profile/{}">{}</a></h2><hr />'.format(handle, handle))
+        file.write(template.render(handle=handle,
+                                   submissions=submissions_per_problem,
+                                   homeworks=homeworks_data))
 
-        per_problem = {}
-        included_in_homework = set()
-        included_in_classwork = set()
-        data = sorted(submissions, key=lambda k: k['creationTimeSeconds'])
 
-        for submission in data:
-            problem = str(submission['problem']['contestId']) + submission['problem']['index']
-            if problem not in per_problem:
-                per_problem[problem] = [submission]
-            else:
-                per_problem[problem].append(submission)
-
-        index = 0
-        homework_scores = {}
-        for homework in term_data['homeworks']:
-            index = index + 1
-            file.write('<div class="card">')
-            file.write('<div class="card-header">Домашняя работа №{}</div>'.format(index))
-            file.write('<ul class="list-group list-group-flush">')
-            file.write('<li class="list-group-item">Задана: {}</li>'.format(homework['from'].strftime("%d.%m.%Y")))
-            file.write('<li class="list-group-item">Сдать до: {}</li>'.format(homework['to'].strftime("%d.%m.%Y")))
-            file.write('</ul><div class="card-body">')
-
-            end_timestamp = next_date_timestamp(homework['to'])
-
-            num_in_time = 0
-            num_late = 0
-            for problem in homework['problems']:
-                included_in_homework.add(problem)
-                file.write('<h5 class="card-title">{}</h5>'.format(problem))
-                if problem not in per_problem:
-                    file.write('<p class="text-danger"><strong>Не было сделано ни одной попытки!</strong>')
-                else:
-                    got_ac = False
-                    in_time = False
-                    for submission in per_problem[problem]:
-                        if submission['verdict'] == 'OK':
-                            got_ac = True
-                            if submission['creationTimeSeconds'] < end_timestamp:
-                                in_time = True
-                                break
-
-                    file.write('Было сделано попыток: {}. '.format(len(per_problem[problem])))
-                    if got_ac and in_time:
-                        num_in_time = num_in_time + 1
-                        file.write('<strong class="text-success">Задача сдана вовремя</strong>')
-                    elif got_ac:
-                        num_late = num_late + 1
-                        file.write('<strong class="text-warning">Задача не была сдана вовремя, однако был сдана позже</strong>')
-                    else:
-                        file.write('<strong class="text-danger">Задача не была сдана</strong>')
-                    file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
-                    file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
-                    for submission in per_problem[problem]:
-                        file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
-                    file.write('</ul>')
-
-            file.write('</div><div class="card-footer">')
-            file.write('<p><strong>Система оценок:</strong> 1 балл за задачу, которая была сдана вовремя; 0.75 за дорешаную позже задачу')
-            file.write('<p>Оценка выставляется исходя из процентного соотношения количества полученных балов к максимально возможному количеству баллов')
-            file.write('<p><=25% - 2; <=50% - 3; <= 75% - 4; > 75% - 5')
-            file.write('</div><div class="card-footer">')
-            score = num_in_time + num_late * 0.75
-            percent = int(score / len(homework['problems']) * 100)
-            if percent <= 25:
-                final_score = 2
-            elif percent <= 50:
-                final_score = 3
-            elif percent <= 75:
-                final_score = 4
-            else:
-                final_score = 5
-            homework_scores[index] = final_score
-            file.write('<p>Всего решено задач: {}, вовремя: {}, дорешано: {}. Оценка: {} ({}/{} - {}%)'.format(num_in_time + num_late, num_in_time, num_late, final_score, score, len(homework['problems']), percent))
-            file.write('</div></div><br />')
-
-        for homework in term_data['classworks']:
-            index = index + 1
-            file.write('<div class="card">')
-            file.write('<div class="card-header">Классная работa {}/{}</div>'.format(homework['dates'][0].strftime("%d.%m.%Y"), homework['dates'][1].strftime("%d.%m.%Y")))
-            file.write('<ul class="list-group list-group-flush">')
-            file.write('</ul><div class="card-body">')
-
-            for problem in homework['problems']:
-                included_in_classwork.add(problem)
-                file.write('<h5 class="card-title">{}</h5>'.format(problem))
-                if problem not in per_problem:
-                    file.write('<p class="text-danger"><strong>Не было сделано ни одной попытки!</strong>')
-                else:
-                    got_ac = False
-                    for submission in per_problem[problem]:
-                        if submission['verdict'] == 'OK':
-                            got_ac = True
-
-                    file.write('Было сделано попыток: {}. '.format(len(per_problem[problem])))
-                    if got_ac:
-                        file.write('<strong class="text-success">Задача сдана</strong>')
-                    else:
-                        file.write('<strong class="text-warning">Задача не была сдана</strong>')
-                    file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
-                    file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
-                    for submission in per_problem[problem]:
-                        file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
-                    file.write('</ul>')
-
-            file.write('</div>')
-            file.write('</div><br />')
-
-        file.write('<div class="card">')
-        file.write('<div class="card-header">Дополнительнo решённые задачи</div>')
-        file.write('<div class="card-body">')
-        count = 0
-        startTimestamp = time.mktime(term_data['from'].timetuple())
-        for problem, submissions in per_problem.items():
-            if problem in included_in_homework or problem in included_in_classwork:
-                continue
-            actual_submissions = []
-            for submission in submissions:
-                if submission['creationTimeSeconds'] >= startTimestamp:
-                    actual_submissions.append(submission)
-
-            if len(actual_submissions) == 0:
-                continue
-
-            count = count + 1
-            file.write('<h5 class="card-title">{}</h5>'.format(problem))
-            got_ac = False
-            for submission in actual_submissions:
-                if submission['verdict'] == 'OK':
-                    got_ac = True
-            if got_ac:
-                file.write('<strong class="text-success">Задача была сдана</strong>')
-            else:
-                file.write('<strong class="text-warning">Задача не была сдана</strong>')
-            file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
-            file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
-            for submission in actual_submissions:
-                file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
-            file.write('</ul>')
-
-        if count == 0:
-            file.write('<p>Ни одной попытки по другим задачам сделано не было')
-
-        file.write('</div></div>')
-
-        file.write('</div></div></div>')
-        file.write(FOOTER)
+#
+#        for homework in term_data['classworks']:
+#            index = index + 1
+#            file.write('<div class="card">')
+#            file.write('<div class="card-header">Классная работa {}/{}</div>'.format(homework['dates'][0].strftime("%d.%m.%Y"), homework['dates'][1].strftime("%d.%m.%Y")))
+#            file.write('<ul class="list-group list-group-flush">')
+#            file.write('</ul><div class="card-body">')
+#
+#            for problem in homework['problems']:
+#                included_in_classwork.add(problem)
+#                file.write('<h5 class="card-title">{}</h5>'.format(problem))
+#                if problem not in per_problem:
+#                    file.write('<p class="text-danger"><strong>Не было сделано ни одной попытки!</strong>')
+#                else:
+#                    got_ac = False
+#                    for submission in per_problem[problem]:
+#                        if submission['verdict'] == 'OK':
+#                            got_ac = True
+#
+#                    file.write('Было сделано попыток: {}. '.format(len(per_problem[problem])))
+#                    if got_ac:
+#                        file.write('<strong class="text-success">Задача сдана</strong>')
+#                    else:
+#                        file.write('<strong class="text-warning">Задача не была сдана</strong>')
+#                    file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
+#                    file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
+#                    for submission in per_problem[problem]:
+#                        file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
+#                    file.write('</ul>')
+#
+#            file.write('</div>')
+#            file.write('</div><br />')
+#
+#        file.write('<div class="card">')
+#        file.write('<div class="card-header">Дополнительнo решённые задачи</div>')
+#        file.write('<div class="card-body">')
+#        count = 0
+#        startTimestamp = time.mktime(term_data['from'].timetuple())
+#        for problem, submissions in per_problem.items():
+#            if problem in included_in_homework or problem in included_in_classwork:
+#                continue
+#            actual_submissions = []
+#            for submission in submissions:
+#                if submission['creationTimeSeconds'] >= startTimestamp:
+#                    actual_submissions.append(submission)
+#
+#            if len(actual_submissions) == 0:
+#                continue
+#
+#            count = count + 1
+#            file.write('<h5 class="card-title">{}</h5>'.format(problem))
+#            got_ac = False
+#            for submission in actual_submissions:
+#                if submission['verdict'] == 'OK':
+#                    got_ac = True
+#            if got_ac:
+#                file.write('<strong class="text-success">Задача была сдана</strong>')
+#            else:
+#                file.write('<strong class="text-warning">Задача не была сдана</strong>')
+#            file.write('<p><a data-toggle="collapse" href="#{}-{}">Показать все попытки</>'.format(handle, problem))
+#            file.write('<ul class="collapse" id="{}-{}">'.format(handle, problem))
+#            for submission in actual_submissions:
+#                file.write('<li><a href="https://codeforces.com/contest/{}/submission/{}">{}</a> - {}</li>'.format(submission['problem']['contestId'], submission['id'], submission['id'], submission['verdict']))
+#            file.write('</ul>')
+#
+#        if count == 0:
+#            file.write('<p>Ни одной попытки по другим задачам сделано не было')
+#
+#        file.write('</div></div>')
+#
+#        file.write('</div></div></div>')
+#        file.write(FOOTER)
 
 
 def render_personal_reports(data_file):
