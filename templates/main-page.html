@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <h1 class="page-header">
+        Отчёт о решении задач на codeforces
+      </h1>
+      <hr />
+
+      <h2>Домашние задания</h2>
+
+      <div class="card-group">
+        {% for homework in homeworks %}
+          <div class="card">
+            <div class="card-header">Домашняя работа №{{ loop.index }}</div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">Задана: {{ homework.from|date }}</li>
+              <li class="list-group-item">Сдать до: {{ homework.to|date }}</li>
+              <li class="list-group-item">Список задач:
+                {% for problem_index in homework.problems %}
+                  {{ problem_index }}
+                {% endfor %}
+              </li>
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+      <br />
+
+      <h2>Классная работа</h2>
+
+      <div class="card-group">
+        {% for classwork in classworks %}
+          <div class="card">
+            <div class="card-header">Классная работа {{ classwork.dates[0]|date }}/{{ classwork.dates[1]|date }}</div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">Список задач:
+                {% for problem_index in classwork.problems %}
+                  {{ problem_index }}
+                {% endfor %}
+              </li>
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+      <br />
+
+      <h2>Список индивидуальных отчётов</h2>
+      <ul>
+        {% for handle in handles %}
+          <li>
+            <a href="https://nnstu-for-38.github.io/2018-2019-10/{{ handle }}.html">
+              {{ handle }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
