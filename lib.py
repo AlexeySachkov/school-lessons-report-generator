@@ -36,12 +36,6 @@ def next_date_timestamp(date):
     return time.mktime(next.timetuple())
 
 
-
-def fetch_submissions(handles):
-    for handle in handles:
-        cache.save('{}.submissions'.format(handle), api.fetch_submissions(handle))
-
-
 def datefilter(v, format='%d.%m.%Y'):
     return v.strftime(format)
 
@@ -50,10 +44,16 @@ def datetimefilter(v, format='%d.%m.%Y %H:%M'):
     return v.strftime(format)
 
 
+def fetch_data(data_file):
+    with open('data/{}'.format(data_file)) as file:
+        data = json.load(file)
+
+    for handle in data['handles']:
+        cache.save('{}.submissions'.format(handle), api.fetch_submissions(handle))
+
+
 def render_personal_report(handle, term_data):
     # Prepare data
-
-    fetch_submissions([handle])
     all_submissions = cache.get('{}.submissions'.format(handle))
 
     data = sorted(all_submissions, key=lambda k: k['creationTimeSeconds'])
@@ -200,6 +200,7 @@ def render_personal_reports(data_file):
 
         for handle in data['handles']:
             render_personal_report(handle, data['terms'][1])
+
 
 def render_main_page(data_file):
     # Prepare data
