@@ -57,8 +57,10 @@ def fetch_submission_source_code(submission):
             connected = True
         except TimeoutError:
             connected = False
+            time.sleep(2)
         except OSError:
             connected = False
+            time.sleep(2)
 
     html = d("#program-source-text").html()
     if html is None:
@@ -72,21 +74,46 @@ def fetch_data(data_file):
     with open('data/{}'.format(data_file)) as file:
         data = json.load(file)
 
+    # TODO: term must be configurable here (0 is hardcoded right now)
+    d, m, y = data['terms'][0]['from']
+    from_date = datetime.date(y, m, d)
+
     for handle in data['handles']:
-        all_submissions = api.fetch_submissions(handle)
+        print('Processing "{}" handle'.format(handle))
+        existing_submissions = cache.get('{}.submissions'.format(handle))
+        if existing_submissions is None:
+            existing_submissions = {}
+
+        new_submissions = api.fetch_submissions(handle)
         # TODO: error handling
-        for submission in all_submissions:
-            key = '{}.{}'.format(handle, submission['id'])
-            if not cache.exists(key):
-                code = fetch_submission_source_code(submission)
+
+        for submission_id, submission in new_submissions.items():
+            submission_id = str(submission_id)
+            if submission_id not in existing_submissions:
+                startTimestamp = time.mktime(from_date.timetuple())
+                if submission['creationTimeSeconds'] >= startTimestamp:
+                    print('trying to get source code for submission {}'.format(submission_id))
+                    code = fetch_submission_source_code(submission)
+                else:
+                    code = None
                 submission['source_code'] = code
-                cache.save(key, submission)
+
+                # add new submission into existing
+                existing_submissions[submission_id] = submission
                 time.sleep(3)
+
+        cache.save('{}.submissions'.format(handle), existing_submissions)
+        time.sleep(5)
 
 
 def render_personal_report(handle, term_data):
     # Prepare data
     all_submissions = cache.get('{}.submissions'.format(handle))
+    if all_submissions is None:
+        print('Please fetch data first!')
+        return
+
+    all_submissions = all_submissions.values()
 
     data = sorted(all_submissions, key=lambda k: k['creationTimeSeconds'])
 
@@ -231,7 +258,8 @@ def render_personal_reports(data_file):
                 classwork['dates'][1] = datetime.date(y, m, d)
 
         for handle in data['handles']:
-            render_personal_report(handle, data['terms'][1])
+            # TODO: term must be configurable
+            render_personal_report(handle, data['terms'][0])
 
 
 def render_main_page(data_file):
@@ -263,7 +291,8 @@ def render_main_page(data_file):
     template = env.get_template('main-page.html')
 
     with codecs.open('reports/index.html', 'w', "utf-8") as file:
+        # TODO: term must be configurable
         file.write(template.render(handles=data['handles'],
-                                   homeworks=data['terms'][1]['homeworks'],
-                                   classworks=data['terms'][1]['classworks'],
+                                   homeworks=data['terms'][0]['homeworks'],
+                                   classworks=data['terms'][0]['classworks'],
                                    last_update=datetime.datetime.now()))

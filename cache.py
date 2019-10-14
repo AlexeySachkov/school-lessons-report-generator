@@ -14,5 +14,8 @@ def save(key, obj):
 
 
 def get(key):
-    with open(BASE_PATH + key + '.json', 'r') as file:
-        return json.load(file)
+    try:
+        with open(BASE_PATH + key + '.json', 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return None

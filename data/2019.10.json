@@ -1,0 +1,54 @@
+{
+  "handles": [
+    "Gleb152",
+    "JanBeloglazov",
+    "Danii1",
+    "LeonVetrov",
+    "VTimofey",
+    "MILIOHA",
+    "gryzlovn",
+    "Seknjaz",
+    "Z-eRo-N",
+    "Twann",
+    "Evgenii743",
+    "natlat16.03",
+    "Makarov888",
+    "Alex1Mart",
+    "ilja_noskov",
+    "Nikita_Sazanov",
+    "Hameltash",
+    "Mhlshmagin",
+    "Ilya927",
+    "m4estr0",
+    "Abrashin_Arteam_13g",
+    "Shlyamova",
+    "geladenisova21",
+    "Averyanova05",
+    "Matysha"
+  ],
+  "terms": [
+    {
+      "from": [1, 9, 2019],
+      "to": [31, 12, 2019],
+      "homeworks": [
+        {
+          "from": [24, 9, 2019],
+          "to": [14, 10, 2019],
+          "problems": ["4A", "1186A", "599A"]
+        }
+      ],
+      "classworks": [
+        {
+          "dates": [
+            [30, 9, 2019],
+            [30, 9, 2019]
+          ],
+          "problems": [
+            "1030A",
+            "263A"
+          ]
+        }
+      ]
+    }
+  ]
+}

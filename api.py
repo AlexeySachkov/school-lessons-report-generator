@@ -27,4 +27,8 @@ def fetch_submissions(handle):
         print("Failed to query submissions")
         return None
 
-    return data['result']
+    result = {}
+    for submission in data['result']:
+        result[submission['id']] = submission
+
+    return result
